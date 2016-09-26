@@ -1,0 +1,78 @@
+group group
+version version
+
+apply plugin: 'java'
+apply plugin: 'application'
+
+sourceCompatibility = 1.8
+group = 'eu.codetopic.anty.lejos'
+version = '1.3'
+compileJava.options.encoding = 'UTF-8'
+mainClassName = group + '.Main'
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': 'EV3 Projects', 'Implementation-Version': version, 'Main-Class': mainClassName
+    }
+    // note this builds one fat jar and it is not recommended for production use - just for illustration purpose
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+}
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'me.tatarka:gradle-retrolambda:3.3.0'
+    }
+}
+
+configurations {
+    sshAntTask
+    provided
+}
+
+
+sourceSets {
+    main.compileClasspath += configurations.provided
+    test.compileClasspath += configurations.provided
+    test.runtimeClasspath += configurations.provided
+}
+repositories {
+    mavenCentral()
+    flatDir {
+        dirs System.getenv('EV3_HOME') + '/lib/ev3'
+    }
+}
+
+
+dependencies {
+    sshAntTask 'org.apache.ant:ant-jsch:1.9.7', 'com.jcraft:jsch:0.1.53'
+    compile group: 'commons-collections', name: 'commons-collections', version: '3.2'
+    provided group: 'lejos', name: 'ev3classes', version: '1.0'
+    testCompile group: 'junit', name: 'junit', version: '4.+'
+}
+
+test {
+    systemProperties 'property': 'value'
+}
+
+task deployEV3 << {
+    ant.taskdef(name: 'scp', classname: 'org.apache.tools.ant.taskdefs.optional.ssh.Scp', classpath: configurations.sshAntTask.asPath)
+    ant.scp(todir: ev3_username + '@' + ev3_server + ':/home/lejos/programs',
+            password: ev3_password,
+            verbose: 'true') {
+        fileset(dir: './build/libs') {
+            include(name: '**/*.jar')
+        }
+    }
+}
+
+apply plugin: 'me.tatarka.retrolambda'
+
+retrolambda {
+    oldJdk System.getenv("JAVA7_HOME")
+    javaVersion JavaVersion.VERSION_1_7
+    defaultMethods true
+}
